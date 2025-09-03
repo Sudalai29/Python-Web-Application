@@ -116,6 +116,7 @@ from wtforms import StringField, TextAreaField, SubmitField
 from wtforms.validators import DataRequired, Length
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from forms import UserForm 
 
 # --- Logging ---
 logging.basicConfig(level=logging.INFO)
@@ -233,11 +234,12 @@ def output():
         users = cur.fetchall()
         cur.close()
         conn.close()
+        form = UserForm() 
     except Exception as e:
         logging.error(f"Error fetching users: {e}")
         users = []
         flash("⚠️ Could not fetch data.", "danger")
-    return render_template('response.html', users=users)
+    return render_template('response.html', users=users, form=form)
 
 
 @app.route('/delete/<string:name>', methods=['POST'])
