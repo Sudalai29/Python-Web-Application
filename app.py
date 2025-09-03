@@ -3,6 +3,10 @@ import json
 from flask import Flask, redirect, url_for, render_template, request
 import psycopg2
 
+DB_NAME="postgres"
+DB_HOST="python-db.cvyas68miksx.ap-south-1.rds.amazonaws.com"
+DB_PORT="5432"
+
 app = Flask(__name__)
 
 # Change these values to match your setup
@@ -27,11 +31,11 @@ def get_db_secret():
 def connect_db():
     secret = get_db_secret()
     conn = psycopg2.connect(
-        database=secret["dbname"],
+        database=DB_NAME,
         user=secret["username"],
         password=secret["password"],
-        host=secret["host"],
-        port=secret["port"]
+        host=DB_HOST,
+        port=DB_PORT
     )
     return conn
 
@@ -98,5 +102,5 @@ def output():
 
 
 if __name__ == '__main__':
-    # run on port 80 for EC2 / container deployment
-    app.run(debug=True, host='0.0.0.0', port=80)
+    app.run(debug=True, host='0.0.0.0', port=5000)
+
