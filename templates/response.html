@@ -5,21 +5,40 @@
 </head>
 <body>
     <h1>All User Entries</h1>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
     <table border="1" cellpadding="10">
         <tr>
             <th>Name</th>
             <th>Quote</th>
             <th>Advice</th>
+            <th>Created At</th>
+            <th>Actions</th>
         </tr>
         {% for user in users %}
         <tr>
-            <td>{{ user[0] }}</td>
-            <td>{{ user[1] }}</td>
-            <td>{{ user[2] }}</td>
+            <td>{{ user.name }}</td>
+            <td>{{ user.quote }}</td>
+            <td>{{ user.advice }}</td>
+            <td>{{ user.created_at }}</td>
+            <td>
+                <form method="POST" action="{{ url_for('delete_user', name=user.name) }}" style="display:inline;">
+                    {{ csrf_token() }}
+                    <button type="submit" onclick="return confirm('Delete user {{ user.name }}?')">Delete</button>
+                </form>
+            </td>
         </tr>
         {% endfor %}
     </table>
+
     <br>
-    <a href="/">Add Another User</a>
+    <a href="{{ url_for('input') }}">Add Another User</a>
 </body>
 </html>
