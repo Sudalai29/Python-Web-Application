@@ -22,6 +22,7 @@
             <th>Created At</th>
             <th>Actions</th>
         </tr>
+
         {% for user in users %}
         <tr>
             <td>{{ user.name }}</td>
@@ -30,10 +31,10 @@
             <td>{{ user.created_at }}</td>
             <td>
                 <form method="POST" action="{{ url_for('delete_user', name=user.name) }}" style="display:inline;">
-                    {{ form.hidden_tag() }}
+                    {{ form.hidden_tag() }} <!-- CSRF token -->
                     <button type="submit" onclick="return confirm('Delete user {{ user.name }}?')">Delete</button>
                 </form>
-            </td>       
+            </td>
         </tr>
         {% endfor %}
     </table>
