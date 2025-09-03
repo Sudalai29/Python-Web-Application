@@ -6,8 +6,8 @@ import psycopg2
 app = Flask(__name__)
 
 # Change these values to match your setup
-SECRET_NAME = "mydb/credentials"   # The secret name in Secrets Manager
-REGION_NAME = "us-east-1"          # AWS region where your secret is stored
+SECRET_NAME = "rds!db-cfce6876-8455-42f4-8483-ab87766c6393"   # The secret name in Secrets Manager
+REGION_NAME = "ap-south-1"          # AWS region where your secret is stored
 
 
 # --- Secrets Manager Integration ---
