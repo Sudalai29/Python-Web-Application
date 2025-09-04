@@ -128,9 +128,9 @@ csrf = CSRFProtect(app)
 
 # --- DB Config (from env variables) ---
 DB_NAME = os.environ.get("DB_NAME", "postgres")
-DB_HOST = os.environ.get("DB_HOST", "python-db.cvyas68miksx.ap-south-1.rds.amazonaws.com")
+DB_HOST = os.environ.get("DB_HOST", "database-1.cvyas68miksx.ap-south-1.rds.amazonaws.com")
 DB_PORT = os.environ.get("DB_PORT", "5432")
-SECRET_NAME = os.environ.get("SECRET_NAME", "rds!db-cfce6876-8455-42f4-8483-ab87766c6393")
+SECRET_NAME = os.environ.get("SECRET_NAME", "rds!db-91c0649a-e7a5-4e4e-b2b7-38b5032307ad")
 REGION_NAME = os.environ.get("REGION_NAME", "ap-south-1")
 
 # --- Secrets Manager Integration ---
