@@ -47,7 +47,7 @@ jobs:
       - name: Scan Docker image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: $ECR_REPO:latest
+          image-ref: '${{ env.ECR_REPO }}:latest'
           format: 'sarif'
           output: 'trivy-results.sarif'
       
@@ -62,7 +62,7 @@ jobs:
       - name: Run Trivy vulnerability scanner (fail on high/critical)
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: $ECR_REPO:latest
+          image-ref: '${{ env.ECR_REPO }}:latest'
           format: 'table'
           exit-code: '1'
           ignore-unfixed: true
