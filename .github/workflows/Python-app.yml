@@ -13,11 +13,12 @@ jobs:
       AWS_REGION: ap-south-1
       ECR_REPO: myapp-dev-repo  # your ECR repo
       IMAGE_TAG: ${{ github.sha }}
-      #CLUSTER_NAME: myapp-dev-cluster
-      #SERVICE_NAME: myapp-dev-service
+      # Uncomment these if you want automatic ECS deployment
+      # CLUSTER_NAME: myapp-dev-cluster
+      # SERVICE_NAME: myapp-dev-service
 
     steps:
-      # 1️⃣ Checkout
+      # 1️⃣ Checkout repository
       - name: Checkout code
         uses: actions/checkout@v3
 
@@ -34,27 +35,48 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      # 4️⃣ Build Docker image
+      # 4️⃣ Set up Docker Buildx for caching and multi-platform builds
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # 5️⃣ Build Docker image with cache
       - name: Build Docker image
         run: |
-          docker build -t $ECR_REPO:latest .
+          docker build \
+            --tag $ECR_REPO:latest \
+            --cache-from=type=registry,ref=${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:latest \
+            .
 
-      # 5️⃣ Tag Docker image
+      # 6️⃣ Security scan with Trivy
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@v2
+        with:
+          image-ref: $ECR_REPO:latest
+          format: 'table'
+          exit-on-vuln: true  # Fail the workflow if vulnerabilities found
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      # 7️⃣ Tag Docker image
       - name: Tag Docker image
         run: |
           docker tag $ECR_REPO:latest ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:${IMAGE_TAG}
           docker tag $ECR_REPO:latest ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:latest
 
-      # 6️⃣ Push Docker image to ECR
+      # 8️⃣ Push Docker image to ECR
       - name: Push Docker image to ECR
         run: |
           docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:${IMAGE_TAG}
           docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:latest
 
-      # 7️⃣ Update ECS service to use new image
+      # 9️⃣ Optional: Update ECS service
+      # Uncomment if you want automatic deployment
       # - name: Update ECS service
       #   run: |
       #     aws ecs update-service \
       #       --cluster $CLUSTER_NAME \
       #       --service $SERVICE_NAME \
       #       --force-new-deployment
+
+      # 🔟 Notify GitHub of deployment success
+      - name: Deployment complete
+        run: echo "✅ Docker image built, scanned, and pushed successfully!"
