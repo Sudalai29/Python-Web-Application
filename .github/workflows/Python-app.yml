@@ -41,39 +41,34 @@ jobs:
       - name: Build Docker image
         run: |
           docker build \
-            --tag $ECR_REPO:latest \
-            --cache-from=type=registry,ref=${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:latest \
+            --tag ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:latest \
+            --tag ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }} \
+            --cache-from=type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:latest \
             .
 
-      # 6️⃣ Scan Docker image with Trivy (master version)
+      # 6️⃣ Scan Docker image with Trivy (fixed image reference)
       - name: Scan Docker image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:latest
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:latest
           format: table
           exit-code: 1
           ignore-unfixed: true
           vuln-type: os,library
           severity: CRITICAL,HIGH
 
-      # 7️⃣ Tag Docker image
-      - name: Tag Docker image
-        run: |
-          docker tag $ECR_REPO:latest ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:${IMAGE_TAG}
-          docker tag $ECR_REPO:latest ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:latest
-
-      # 8️⃣ Push Docker image to ECR
+      # 7️⃣ Push Docker image to ECR (simplified since we already tagged in build step)
       - name: Push Docker image to ECR
         run: |
-          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:${IMAGE_TAG}
-          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:latest
+          docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}
+          docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:latest
 
-      # 9️⃣ Register new ECS task definition with SHA tag
+      # 8️⃣ Register new ECS task definition with SHA tag
       - name: Register new ECS task definition
         id: task-def
         run: |
           FAMILY="${{ env.CONTAINER_NAME }}-task"
-          IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:${IMAGE_TAG}"
+          IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}"
 
           # Get current task definition
           aws ecs describe-task-definition --task-definition $FAMILY > task-def.json
@@ -91,7 +86,7 @@ jobs:
 
           echo "NEW_TASK_DEF_ARN=$NEW_TASK_DEF_ARN" >> $GITHUB_ENV
 
-      # 🔟 Update ECS service to use new task definition
+      # 9️⃣ Update ECS service to use new task definition
       - name: Update ECS service
         run: |
           aws ecs update-service \
@@ -100,6 +95,6 @@ jobs:
             --task-definition ${{ env.NEW_TASK_DEF_ARN }} \
             --force-new-deployment
 
-      # 1️⃣1️⃣ Notify deployment success
+      # 🔟 Notify deployment success
       - name: Deployment complete
         run: echo "✅ Docker image built, scanned, pushed, and ECS updated successfully!"
