@@ -1,14 +1,11 @@
 name: CI/CD Fargate Deployment
-
 on:
   push:
     branches:
       - main
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     env:
       AWS_REGION: ap-south-1
       ECR_REPO: myapp-dev-repo  # your ECR repo
@@ -16,29 +13,28 @@ jobs:
       # Uncomment these if you want automatic ECS deployment
       # CLUSTER_NAME: myapp-dev-cluster
       # SERVICE_NAME: myapp-dev-service
-
     steps:
       # 1️⃣ Checkout repository
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
           
       # 2️⃣ Configure AWS credentials
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-
+      
       # 3️⃣ Login to ECR
       - name: Login to Amazon ECR
         id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-
+        uses: aws-actions/amazon-ecr-login@v2
+      
       # 4️⃣ Set up Docker Buildx for caching and multi-platform builds
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
+        uses: docker/setup-buildx-action@v3
+      
       # 5️⃣ Build Docker image with cache
       - name: Build Docker image
         run: |
@@ -46,28 +42,45 @@ jobs:
             --tag $ECR_REPO:latest \
             --cache-from=type=registry,ref=${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:latest \
             .
-
+      
       # 6️⃣ Security scan with Trivy
       - name: Scan Docker image with Trivy
-        uses: aquasecurity/trivy-action@v0.33.1
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: $ECR_REPO:latest
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      # 6b️⃣ Upload Trivy scan results to GitHub Security tab
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+      
+      # 6c️⃣ Run Trivy scan with table output and fail on vulnerabilities
+      - name: Run Trivy vulnerability scanner (fail on high/critical)
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: $ECR_REPO:latest
           format: 'table'
-          exit-on-vuln: true  # Fail the workflow if vulnerabilities found
-          severity: 'CRITICAL,HIGH,MEDIUM'
-
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+      
       # 7️⃣ Tag Docker image
       - name: Tag Docker image
         run: |
           docker tag $ECR_REPO:latest ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:${IMAGE_TAG}
           docker tag $ECR_REPO:latest ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:latest
-
+      
       # 8️⃣ Push Docker image to ECR
       - name: Push Docker image to ECR
         run: |
           docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:${IMAGE_TAG}
           docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:latest
-
+      
       # 9️⃣ Optional: Update ECS service
       # Uncomment if you want automatic deployment
       # - name: Update ECS service
@@ -76,7 +89,7 @@ jobs:
       #       --cluster $CLUSTER_NAME \
       #       --service $SERVICE_NAME \
       #       --force-new-deployment
-
+      
       # 🔟 Notify GitHub of deployment success
       - name: Deployment complete
         run: echo "✅ Docker image built, scanned, and pushed successfully!"
