@@ -13,7 +13,7 @@ jobs:
       IMAGE_TAG: ${{ github.sha }}       # unique SHA for immutable deployment
       CLUSTER_NAME: myapp-dev-cluster    # ECS cluster created via Terraform
       SERVICE_NAME: myapp-dev-service    # ECS service created via Terraform
-      CONTAINER_NAME: myapp-container    # container name used in task definition
+      CONTAINER_NAME: app    # container name used in task definition
 
     steps:
       # 1️⃣ Checkout repository
