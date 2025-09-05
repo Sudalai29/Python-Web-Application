@@ -2,44 +2,64 @@
 <html>
 <head>
     <title>User Data</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
-    <h1>All User Entries</h1>
+<body class="bg-light">
+
+<div class="container mt-5">
+    <h1 class="mb-4 text-success">📋 All User Entries</h1>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
-          <div class="flash {{ category }}">{{ message }}</div>
+          <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
         {% endfor %}
       {% endif %}
     {% endwith %}
 
-    <table border="1" cellpadding="10">
-        <tr>
-            <th>Name</th>
-            <th>Quote</th>
-            <th>Advice</th>
-            <th>Created At</th>
-            <th>Actions</th>
-        </tr>
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Name</th>
+                        <th>Quote</th>
+                        <th>Advice</th>
+                        <th>Created At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for user in users %}
+                    <tr>
+                        <td>{{ user.name }}</td>
+                        <td>{{ user.quote }}</td>
+                        <td>{{ user.advice }}</td>
+                        <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M:%S') if user.created_at else '' }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('delete_user', name=user.name) }}" style="display:inline;">
+                                {{ form.hidden_tag() }}
+                                <button type="submit" class="btn btn-sm btn-danger"
+                                    onclick="return confirm('Are you sure you want to delete {{ user.name }}?')">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 
-        {% for user in users %}
-        <tr>
-            <td>{{ user.name }}</td>
-            <td>{{ user.quote }}</td>
-            <td>{{ user.advice }}</td>
-            <td>{{ user.created_at }}</td>
-            <td>
-                <form method="POST" action="{{ url_for('delete_user', name=user.name) }}" style="display:inline;">
-                    {{ form.hidden_tag() }} <!-- CSRF token -->
-                    <button type="submit" onclick="return confirm('Delete user {{ user.name }}?')">Delete</button>
-                </form>
-            </td>
-        </tr>
-        {% endfor %}
-    </table>
+    <div class="mt-4">
+        <a href="{{ url_for('input') }}" class="btn btn-outline-primary">➕ Add Another User</a>
+    </div>
+</div>
 
-    <br>
-    <a href="{{ url_for('input') }}">Add Another User</a>
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
