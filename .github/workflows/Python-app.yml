@@ -1,0 +1,60 @@
+name: CI/CD Fargate Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_REGION: ap-south-1
+      ECR_REPO: myapp-dev-repo  # your ECR repo
+      IMAGE_TAG: ${{ github.sha }}
+      #CLUSTER_NAME: myapp-dev-cluster
+      #SERVICE_NAME: myapp-dev-service
+
+    steps:
+      # 1️⃣ Checkout
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2️⃣ Configure AWS credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # 3️⃣ Login to ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      # 4️⃣ Build Docker image
+      - name: Build Docker image
+        run: |
+          docker build -t $ECR_REPO:latest .
+
+      # 5️⃣ Tag Docker image
+      - name: Tag Docker image
+        run: |
+          docker tag $ECR_REPO:latest ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:${IMAGE_TAG}
+          docker tag $ECR_REPO:latest ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:latest
+
+      # 6️⃣ Push Docker image to ECR
+      - name: Push Docker image to ECR
+        run: |
+          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:${IMAGE_TAG}
+          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:latest
+
+      # 7️⃣ Update ECS service to use new image
+      # - name: Update ECS service
+      #   run: |
+      #     aws ecs update-service \
+      #       --cluster $CLUSTER_NAME \
+      #       --service $SERVICE_NAME \
+      #       --force-new-deployment
