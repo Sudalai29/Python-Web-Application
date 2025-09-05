@@ -3,21 +3,23 @@ on:
   push:
     branches:
       - main
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
       AWS_REGION: ap-south-1
-      ECR_REPO: myapp-dev-repo  # your ECR repo
-      IMAGE_TAG: ${{ github.sha }}
-      # Uncomment these if you want automatic ECS deployment
-      # CLUSTER_NAME: myapp-dev-cluster
-      # SERVICE_NAME: myapp-dev-service
+      ECR_REPO: myapp-dev-repo           # your ECR repo
+      IMAGE_TAG: ${{ github.sha }}       # unique SHA for immutable deployment
+      CLUSTER_NAME: myapp-dev-cluster    # ECS cluster created via Terraform
+      SERVICE_NAME: myapp-dev-service    # ECS service created via Terraform
+      CONTAINER_NAME: myapp-container    # container name used in task definition
+
     steps:
       # 1️⃣ Checkout repository
       - name: Checkout code
         uses: actions/checkout@v4
-          
+
       # 2️⃣ Configure AWS credentials
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -25,16 +27,16 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-      
-      # 3️⃣ Login to ECR
+
+      # 3️⃣ Login to Amazon ECR
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-      
-      # 4️⃣ Set up Docker Buildx for caching and multi-platform builds
+
+      # 4️⃣ Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      
+
       # 5️⃣ Build Docker image with cache
       - name: Build Docker image
         run: |
@@ -42,39 +44,60 @@ jobs:
             --tag $ECR_REPO:latest \
             --cache-from=type=registry,ref=${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:latest \
             .
-      
-      # 6c️⃣ Run Trivy scan with table output and fail on vulnerabilities
-      - name: Run Trivy vulnerability scanner (fail on high/critical)
-        uses: aquasecurity/trivy-action@master
+
+      # 6️⃣ Scan Docker image with Trivy
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@v0.32.0
         with:
-          image-ref: '${{ env.ECR_REPO }}:latest'
+          image-ref: $ECR_REPO:latest
           format: 'table'
-          exit-code: '1'
-          ignore-unfixed: true
-          vuln-type: 'os,library'
+          exit-on-vuln: true
           severity: 'CRITICAL,HIGH'
-      
+
       # 7️⃣ Tag Docker image
       - name: Tag Docker image
         run: |
           docker tag $ECR_REPO:latest ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:${IMAGE_TAG}
           docker tag $ECR_REPO:latest ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:latest
-      
+
       # 8️⃣ Push Docker image to ECR
       - name: Push Docker image to ECR
         run: |
           docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:${IMAGE_TAG}
           docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:latest
-      
-      # 9️⃣ Optional: Update ECS service
-      # Uncomment if you want automatic deployment
-      # - name: Update ECS service
-      #   run: |
-      #     aws ecs update-service \
-      #       --cluster $CLUSTER_NAME \
-      #       --service $SERVICE_NAME \
-      #       --force-new-deployment
-      
-      # 🔟 Notify GitHub of deployment success
+
+      # 9️⃣ Register new ECS task definition with SHA tag
+      - name: Register new ECS task definition
+        id: task-def
+        run: |
+          FAMILY="${{ env.CONTAINER_NAME }}-task"
+          IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/$ECR_REPO:${IMAGE_TAG}"
+
+          # Get current task definition
+          aws ecs describe-task-definition --task-definition $FAMILY > task-def.json
+
+          # Update container image
+          jq --arg IMAGE "$IMAGE_URI" \
+            '.taskDefinition | {family: .family, containerDefinitions: [.containerDefinitions[0] | .image=$IMAGE, .name, .essential, .portMappings, .logConfiguration, .secrets], networkMode: .networkMode, requiresCompatibilities: .requiresCompatibilities, cpu: .cpu, memory: .memory, executionRoleArn: .executionRoleArn, taskRoleArn: .taskRoleArn}' \
+            task-def.json > new-task-def.json
+
+          # Register new task definition
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://new-task-def.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+
+          echo "NEW_TASK_DEF_ARN=$NEW_TASK_DEF_ARN" >> $GITHUB_ENV
+
+      # 🔟 Update ECS service to use new task definition
+      - name: Update ECS service
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.CLUSTER_NAME }} \
+            --service ${{ env.SERVICE_NAME }} \
+            --task-definition ${{ env.NEW_TASK_DEF_ARN }} \
+            --force-new-deployment
+
+      # 1️⃣1️⃣ Notify deployment success
       - name: Deployment complete
-        run: echo "✅ Docker image built, scanned, and pushed successfully!"
+        run: echo "✅ Docker image built, scanned, pushed, and ECS updated successfully!"
