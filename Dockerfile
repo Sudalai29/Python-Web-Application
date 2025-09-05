@@ -1,7 +1,7 @@
 # -------- Stage 1: Build Stage --------
 FROM python:3.12-slim AS build
 
-# Set work directory
+# Set working directory
 WORKDIR /app
 
 # Install build dependencies
@@ -11,7 +11,7 @@ RUN apt-get update && \
         libpq-dev \
         gcc \
         curl \
-        && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip
 RUN python -m pip install --upgrade pip
@@ -42,13 +42,13 @@ ENV PATH="/usr/local/bin:$PATH"
 COPY --from=build /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=build /app /app
 
-# Expose Flask port
+# Expose the Flask port
 EXPOSE 5000
 
-# Environment variables (can override with docker run -e)
+# Environment variables
 ENV FLASK_APP=app.py
 ENV FLASK_RUN_HOST=0.0.0.0
 ENV FLASK_RUN_PORT=5000
 
-# Run the Flask app
-CMD ["python", "-m", "flask", "run"]
+# Run the app 
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app", "--workers", "3", "--timeout", "30"]
