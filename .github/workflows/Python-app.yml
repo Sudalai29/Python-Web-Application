@@ -83,11 +83,29 @@ jobs:
           # 📥 Get current task definition JSON
           aws ecs describe-task-definition --task-definition $REVISION > task-def.json
 
-          # 📝 Update only the container image
+          # 📝 Update only the container image, strip out read-only fields
           jq --arg IMAGE "$IMAGE_URI" \
-            '.taskDefinition.containerDefinitions[0].image = $IMAGE
-             | .taskDefinition' \
-            task-def.json > new-task-def.json
+            '.taskDefinition
+             | .containerDefinitions[0].image = $IMAGE
+             | {
+                family,
+                taskRoleArn,
+                executionRoleArn,
+                networkMode,
+                containerDefinitions,
+                volumes,
+                placementConstraints,
+                requiresCompatibilities,
+                cpu,
+                memory,
+                tags,
+                pidMode,
+                ipcMode,
+                proxyConfiguration,
+                inferenceAccelerators,
+                ephemeralStorage,
+                runtimePlatform
+              }' task-def.json > new-task-def.json
 
           # 🚀 Register new task definition
           NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
@@ -96,6 +114,7 @@ jobs:
             --output text)
 
           echo "NEW_TASK_DEF_ARN=$NEW_TASK_DEF_ARN" >> $GITHUB_ENV
+
 
 
       # 9️⃣ Update ECS service to use new task definition
