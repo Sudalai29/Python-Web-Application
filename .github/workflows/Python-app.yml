@@ -72,9 +72,7 @@ jobs:
       
           REVISION=$(aws ecs list-task-definitions \
             --family-prefix $FAMILY \
-            --sort DESC \
-            --max-items 1 \
-            --query 'taskDefinitionArns[0]' \
+            --query 'taskDefinitionArns | sort_by(@, &split(`:`)[-1]|tonumber) | [-1]' \
             --output text)
       
           echo "Using base task definition: $REVISION"
