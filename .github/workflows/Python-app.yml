@@ -85,7 +85,7 @@ jobs:
 
           # 📝 Update only the container image and strip unsupported fields
           jq --arg IMAGE "$IMAGE_URI" \
-            '.taskDefinition.containerDefinitions[0].image = $IMAGE \
+            '.taskDefinition.containerDefinitions[0].image = $IMAGE' \
             task-def.json > new-task-def.json
 
           # 🚀 Register new task definition
