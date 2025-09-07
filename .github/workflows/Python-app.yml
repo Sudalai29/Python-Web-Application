@@ -67,7 +67,7 @@ jobs:
       - name: Register new ECS task definition
         id: task-def
         run: |
-          FAMILY="${{ env.CONTAINER_NAME }}-task"
+          FAMILY="${{ env.CONTAINER_NAME }}-dev-task"
           IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}"
 
           # 🔎 Get latest task definition revision ARN for this family
