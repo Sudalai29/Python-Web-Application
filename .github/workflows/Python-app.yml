@@ -85,18 +85,8 @@ jobs:
 
           # 📝 Update only the container image and strip unsupported fields
           jq --arg IMAGE "$IMAGE_URI" \
-            '.taskDefinition
-             | .containerDefinitions[0].image = $IMAGE
-             | {
-                 family,
-                 taskRoleArn,
-                 executionRoleArn,
-                 networkMode,
-                 containerDefinitions,
-                 requiresCompatibilities,
-                 cpu,
-                 memory
-               }' task-def.json > new-task-def.json
+            '.taskDefinition.containerDefinitions[0].image = $IMAGE
+            task-def.json > new-task-def.json
 
           # 🚀 Register new task definition
           NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
