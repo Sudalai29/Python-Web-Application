@@ -70,12 +70,13 @@ jobs:
           FAMILY="my${{ env.CONTAINER_NAME }}-dev-task"
           IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}"
       
-          REVISION=$(aws ecs list-task-definitions \
-            --family-prefix $FAMILY \
-            --query 'taskDefinitionArns | sort_by(@, &split(`:`)[-1]|tonumber) | [-1]' \
-            --output text)
-      
-          echo "Using base task definition: $REVISION"
+          ARNS=$(aws ecs list-task-definitions \
+              --family-prefix $FAMILY \
+              --output text \
+              --query 'taskDefinitionArns')
+          
+          # Pick the highest revision numerically
+          REVISION=$(echo $ARNS | tr '\t' '\n' | sort -t: -k6 -n | tail -1)
       
           aws ecs describe-task-definition --task-definition $REVISION > task-def.json
       
