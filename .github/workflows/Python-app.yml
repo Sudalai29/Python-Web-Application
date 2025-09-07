@@ -72,11 +72,11 @@ jobs:
       
           ARNS=$(aws ecs list-task-definitions \
               --family-prefix $FAMILY \
-              --output text \
-              --query 'taskDefinitionArns')
+              --query 'taskDefinitionArns' \
+              --output text | tr '\t' '\n')
           
           # Pick the highest revision numerically
-          REVISION=$(echo $ARNS | tr '\t' '\n' | sort -t: -k6 -n | tail -1)
+          REVISION=$(echo "$ARNS" | sort -t: -k6 -n | tail -1)
       
           aws ecs describe-task-definition --task-definition $REVISION > task-def.json
       
