@@ -10,6 +10,7 @@
 <div class="container mt-5">
     <h1 class="mb-4 text-success">📋 All User Entries</h1>
 
+    <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
@@ -20,6 +21,14 @@
         {% endfor %}
       {% endif %}
     {% endwith %}
+
+    <!-- Search Form -->
+    <form method="get" action="{{ url_for('output') }}" class="mb-3">
+        <div class="input-group">
+            <input type="text" name="search" class="form-control" placeholder="Search by name" value="{{ search }}">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </div>
+    </form>
 
     <div class="card shadow-sm">
         <div class="table-responsive">
@@ -39,7 +48,7 @@
                         <td>{{ user.name }}</td>
                         <td>{{ user.quote }}</td>
                         <td>{{ user.advice }}</td>
-                        <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M:%S') if user.created_at else '' }}</td>
+                        <td>{{ user.created_at }}</td> <!-- already formatted in Flask -->
                         <td>
                             <form method="POST" action="{{ url_for('delete_user', name=user.name) }}" style="display:inline;">
                                 {{ form.hidden_tag() }}
@@ -47,6 +56,10 @@
                                     onclick="return confirm('Are you sure you want to delete {{ user.name }}?')">Delete</button>
                             </form>
                         </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center">No users found.</td>
                     </tr>
                 {% endfor %}
                 </tbody>
