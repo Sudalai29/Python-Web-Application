@@ -70,21 +70,33 @@ jobs:
           FAMILY="${{ env.CONTAINER_NAME }}-task"
           IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}"
 
-          # Get current task definition
-          aws ecs describe-task-definition --task-definition $FAMILY > task-def.json
+          # 🔎 Get latest task definition revision ARN for this family
+          REVISION=$(aws ecs list-task-definitions \
+            --family-prefix $FAMILY \
+            --sort DESC \
+            --max-items 1 \
+            --query 'taskDefinitionArns[0]' \
+            --output text)
 
-          # Update container image
+          echo "Using base task definition: $REVISION"
+
+          # 📥 Get current task definition JSON
+          aws ecs describe-task-definition --task-definition $REVISION > task-def.json
+
+          # 📝 Update only the container image
           jq --arg IMAGE "$IMAGE_URI" \
-            '.taskDefinition | {family: .family, containerDefinitions: [.containerDefinitions[0] | .image=$IMAGE, .name, .essential, .portMappings, .logConfiguration, .secrets], networkMode: .networkMode, requiresCompatibilities: .requiresCompatibilities, cpu: .cpu, memory: .memory, executionRoleArn: .executionRoleArn, taskRoleArn: .taskRoleArn}' \
+            '.taskDefinition.containerDefinitions[0].image = $IMAGE
+             | .taskDefinition' \
             task-def.json > new-task-def.json
 
-          # Register new task definition
+          # 🚀 Register new task definition
           NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
             --cli-input-json file://new-task-def.json \
             --query 'taskDefinition.taskDefinitionArn' \
             --output text)
 
           echo "NEW_TASK_DEF_ARN=$NEW_TASK_DEF_ARN" >> $GITHUB_ENV
+
 
       # 9️⃣ Update ECS service to use new task definition
       - name: Update ECS service
