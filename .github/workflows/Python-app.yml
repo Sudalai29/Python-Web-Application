@@ -95,7 +95,8 @@ jobs:
                  containerDefinitions,
                  requiresCompatibilities,
                  cpu,
-                 memory
+                 memory,
+                 ephemeralStorage?
                }' task-def.json > new-task-def.json
 
           # 🚀 Register new task definition
