@@ -20,9 +20,9 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "supersecretkey")
 csrf = CSRFProtect(app)
 
 # --- DB Config (from env variables) ---
-DB_NAME = os.environ.get("DB_NAME", "postgres")
-DB_HOST = os.environ.get("DB_HOST", "myapp-dev-db.cvyas68miksx.ap-south-1.rds.amazonaws.com")
-DB_PORT = os.environ.get("DB_PORT", "5432")
+# DB_NAME = os.environ.get("DB_NAME", "postgres")
+# DB_HOST = os.environ.get("DB_HOST", "myapp-dev-db.cvyas68miksx.ap-south-1.rds.amazonaws.com")
+# DB_PORT = os.environ.get("DB_PORT", "5432")
 SECRET_NAME = os.environ.get("SECRET_NAME", "myapp-dev-db-secret")
 REGION_NAME = os.environ.get("REGION_NAME", "ap-south-1")
 
@@ -47,11 +47,16 @@ def connect_db():
     secret = get_db_secret()
     try:
         conn = psycopg2.connect(
-            database=DB_NAME,
+            # database=DB_NAME,
+            # user=secret["username"],
+            # password=secret["password"],
+            # host=DB_HOST,
+            # port=DB_PORT,
+            database=secret["dbname"],
             user=secret["username"],
             password=secret["password"],
-            host=DB_HOST,
-            port=DB_PORT,
+            host=secret["host"],
+            port=secret["port"],
             cursor_factory=RealDictCursor
         )
         return conn
