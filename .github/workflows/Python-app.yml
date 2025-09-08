@@ -1,26 +1,28 @@
+
 name: CI/CD Fargate Deployment
+
 on:
   push:
     branches:
       - main
 
 jobs:
-  deploy:
+  # -------------------------------
+  # Dev Deployment (auto)
+  # -------------------------------
+  deploy-dev:
     runs-on: ubuntu-latest
     env:
       AWS_REGION: ap-south-1
-      ECR_REPO: myapp-dev-repo           # your ECR repo
-      IMAGE_TAG: ${{ github.sha }}       # unique SHA for immutable deployment
-      CLUSTER_NAME: myapp-dev-cluster    # ECS cluster created via Terraform
-      SERVICE_NAME: myapp-dev-service    # ECS service created via Terraform
-      CONTAINER_NAME: app    # container name used in task definition
-
+      ECR_REPO: myapp-dev-repo
+      IMAGE_TAG: ${{ github.sha }}
+      CLUSTER_NAME: myapp-dev-cluster
+      SERVICE_NAME: myapp-dev-service
+      CONTAINER_NAME: app
     steps:
-      # 1️⃣ Checkout repository
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️⃣ Configure AWS credentials
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -28,12 +30,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # 3️⃣ Login to Amazon ECR
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # 4️⃣ Set up Docker Buildx
+      # Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -63,13 +64,11 @@ jobs:
           docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}
           docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:latest
 
-      # 8️⃣ Register new ECS task definition with SHA tag
-      - name: Register new ECS task definition
-        id: task-def
+      - name: Update ECS task definition (Dev)
         run: |
           FAMILY="my${{ env.CONTAINER_NAME }}-dev-task"
           IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}"
-      
+
           ARNS=$(aws ecs list-task-definitions \
               --family-prefix $FAMILY \
               --query 'taskDefinitionArns' \
@@ -77,33 +76,31 @@ jobs:
           
           # Pick the highest revision numerically
           REVISION=$(echo "$ARNS" | sort -t: -k6 -n | tail -1)
-      
+
           aws ecs describe-task-definition --task-definition $REVISION > task-def.json
-      
+
           jq --arg IMAGE "$IMAGE_URI" \
             '.taskDefinition
-              | .containerDefinitions[0].image = $IMAGE
-              | { 
-                  family,
-                  taskRoleArn,
-                  executionRoleArn,
-                  networkMode,
-                  containerDefinitions,
-                  requiresCompatibilities,
-                  cpu,
-                  memory
-                }' \
-            task-def.json > new-task-def.json
-      
+             | .containerDefinitions[0].image = $IMAGE
+             | {
+                 family,
+                 taskRoleArn,
+                 executionRoleArn,
+                 networkMode,
+                 containerDefinitions,
+                 requiresCompatibilities,
+                 cpu,
+                 memory
+               }' task-def.json > new-task-def.json
+
           NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
             --cli-input-json file://new-task-def.json \
             --query 'taskDefinition.taskDefinitionArn' \
             --output text)
-      
+
           echo "NEW_TASK_DEF_ARN=$NEW_TASK_DEF_ARN" >> $GITHUB_ENV
 
-      # 9️⃣ Update ECS service to use new task definition
-      - name: Update ECS service
+      - name: Update ECS service (Dev)
         run: |
           aws ecs update-service \
             --cluster ${{ env.CLUSTER_NAME }} \
@@ -111,6 +108,87 @@ jobs:
             --task-definition ${{ env.NEW_TASK_DEF_ARN }} \
             --force-new-deployment
 
-      # 🔟 Notify deployment success
+  # -------------------------------
+  # Prod Deployment (manual approval)
+  # -------------------------------
+  deploy-prod:
+    runs-on: ubuntu-latest
+    needs: deploy-dev
+    environment: prod   # ← GitHub Environments manual approval
+    env:
+      AWS_REGION: ap-south-1
+      ECR_REPO: myapp-prod-repo
+      IMAGE_TAG: ${{ github.sha }}
+      CLUSTER_NAME: myapp-prod-cluster
+      SERVICE_NAME: myapp-prod-service
+      CONTAINER_NAME: app
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Promote Image to Prod ECR
+        run: |
+          DEV_IMAGE="${{ steps.login-ecr.outputs.registry }}/myapp-dev-repo:${{ env.IMAGE_TAG }}"
+          PROD_IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}"
+
+          docker pull $DEV_IMAGE
+          docker tag $DEV_IMAGE $PROD_IMAGE
+          docker push $PROD_IMAGE
+
+      - name: Update ECS task definition (Prod)
+        run: |
+          FAMILY="my${{ env.CONTAINER_NAME }}-prod-task"
+          IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO }}:${{ env.IMAGE_TAG }}"
+
+          ARNS=$(aws ecs list-task-definitions \
+              --family-prefix $FAMILY \
+              --query 'taskDefinitionArns' \
+              --output text | tr '\t' '\n')
+          
+          # Pick the highest revision numerically
+          REVISION=$(echo "$ARNS" | sort -t: -k6 -n | tail -1)
+
+          aws ecs describe-task-definition --task-definition $REVISION > task-def.json
+
+          jq --arg IMAGE "$IMAGE_URI" \
+            '.taskDefinition
+             | .containerDefinitions[0].image = $IMAGE
+             | {
+                 family,
+                 taskRoleArn,
+                 executionRoleArn,
+                 networkMode,
+                 containerDefinitions,
+                 requiresCompatibilities,
+                 cpu,
+                 memory
+               }' task-def.json > new-task-def.json
+
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://new-task-def.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+
+          echo "NEW_TASK_DEF_ARN=$NEW_TASK_DEF_ARN" >> $GITHUB_ENV
+
+      - name: Update ECS service (Prod)
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.CLUSTER_NAME }} \
+            --service ${{ env.SERVICE_NAME }} \
+            --task-definition ${{ env.NEW_TASK_DEF_ARN }} \
+            --force-new-deployment
+
+      # Notify deployment success
       - name: Deployment complete
         run: echo "✅ Docker image built, scanned, pushed, and ECS updated successfully!"
