@@ -4,7 +4,7 @@ name: CI/CD Fargate Deployment
 on:
   push:
     branches:
-      - main
+      - temp-disable
 
 jobs:
   # -------------------------------
