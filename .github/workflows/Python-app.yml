@@ -138,24 +138,12 @@ jobs:
 
       - name: Promote Image to Prod ECR
         run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          REGION=${{ env.AWS_REGION }}
-          IMAGE_TAG=${{ env.IMAGE_TAG }}
-      
-          # Get the manifest from Dev repo
-          MANIFEST=$(aws ecr batch-get-image \
-            --repository-name myapp-dev-repo \
-            --image-ids imageTag=$IMAGE_TAG \
-            --query 'images[0].imageManifest' \
-            --output text)
-      
-          # Put the manifest into Prod repo (same image digest)
-          aws ecr put-image \
-            --repository-name myapp-prod-repo \
-            --image-tag $IMAGE_TAG \
-            --image-manifest "$MANIFEST"
-      
-          echo "✅ Promoted $IMAGE_TAG from dev to prod without re-pulling"
+          DEV_IMAGE="${{ steps.login-ecr.outputs.registry }}/myapp-dev-repo:${{ env.IMAGE_TAG }}"
+          PROD_IMAGE="${{ steps.login-ecr.outputs.registry }}/myapp-prod-repo:${{ env.IMAGE_TAG }}"
+          
+          docker pull $DEV_IMAGE
+          docker tag $DEV_IMAGE $PROD_IMAGE
+          docker push $PROD_IMAGE
 
       - name: Update ECS task definition (Prod)
         run: |
