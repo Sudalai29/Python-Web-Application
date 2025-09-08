@@ -20,8 +20,15 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", "supersecretkey")
 csrf = CSRFProtect(app)
 
 # --- DB Config (from env variables) ---
-SECRET_NAME = os.environ.get("SECRET_NAME", "myapp-dev-db-secret")
+ENV = os.environ.get("ENVIRONMENT", "dev")
 REGION_NAME = os.environ.get("REGION_NAME", "ap-south-1")
+
+SECRET_MAP = {
+    "dev": "myapp-dev-db-secret",
+    "prod": "myapp-prod-db-secret"
+}
+
+SECRET_NAME = SECRET_MAP.get(ENV, "myapp-dev-db-secret")
 
 # --- Secrets Manager Integration ---
 _db_secret_cache = None
@@ -34,8 +41,9 @@ def get_db_secret():
             client = boto3.client("secretsmanager", region_name=REGION_NAME)
             response = client.get_secret_value(SecretId=SECRET_NAME)
             _db_secret_cache = json.loads(response['SecretString'])
+            logging.info(f"Fetched DB secret for environment '{ENV}'.")
         except Exception as e:
-            logging.error(f"Failed to retrieve secret: {e}")
+            logging.error(f"Failed to retrieve secret '{SECRET_NAME}': {e}")
             raise
     return _db_secret_cache
 
@@ -50,7 +58,7 @@ def init_db_pool(minconn=1, maxconn=5):
         host=secret["host"],
         port=secret["port"]
     )
-    logging.info("DB connection pool initialized.")
+    logging.info(f"DB connection pool initialized for environment '{ENV}'.")
 
 def get_db_conn():
     return _db_pool.getconn()
