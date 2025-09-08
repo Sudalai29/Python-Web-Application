@@ -138,12 +138,18 @@ jobs:
 
       - name: Promote Image to Prod ECR
         run: |
-          DEV_IMAGE="${{ steps.login-ecr.outputs.registry }}/myapp-dev-repo:${{ env.IMAGE_TAG }}"
-          PROD_IMAGE="${{ steps.login-ecr.outputs.registry }}/myapp-prod-repo:${{ env.IMAGE_TAG }}"
-          
+          DEV_IMAGE="${REGISTRY}/myapp-dev-repo:${IMAGE_TAG}"
+          PROD_IMAGE="${REGISTRY}/myapp-prod-repo:${IMAGE_TAG}"
+      
+          echo "DEV_IMAGE=$DEV_IMAGE"
+          echo "PROD_IMAGE=$PROD_IMAGE"
+      
           docker pull $DEV_IMAGE
           docker tag $DEV_IMAGE $PROD_IMAGE
           docker push $PROD_IMAGE
+        env:
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
 
       - name: Update ECS task definition (Prod)
         run: |
