@@ -170,6 +170,10 @@ jobs:
           jq --arg IMAGE "$IMAGE_URI" \
             '.taskDefinition
              | .containerDefinitions[0].image = $IMAGE
+             | .containerDefinitions[0].environment += [
+                {"name":"ENVIRONMENT","value":"prod"},
+                {"name":"REGION_NAME","value":"ap-south-1"}
+              ]
              | {
                  family,
                  taskRoleArn,
