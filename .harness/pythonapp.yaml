@@ -1,0 +1,69 @@
+pipeline:
+  name: PythonWebApp-CI-CD
+  identifier: python_webapp_pipeline
+  projectIdentifier: default
+  orgIdentifier: default
+  stages:
+    # ------------------------------
+    # CI Stage: Build & Push Docker
+    # ------------------------------
+    - stage:
+        name: BuildAndPush
+        identifier: build_and_push
+        type: CI
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Docker
+          steps:
+            - step:
+                name: Build and Push Docker Image
+                identifier: build_push_docker
+                type: BuildAndPushDockerRegistry
+                spec:
+                  connectorRef: dockerhub_connector
+                  repo: sudalai/python-webapp      # Docker Hub repo
+                  tags:
+                    - latest
+                outputVariables:
+                  - name: IMAGE
+                    value: <+step.output.image>
+                  - name: IMAGE_TAG
+                    value: <+step.output.imageTag>
+
+    # ------------------------------
+    # CD Stage: Helm Deployment
+    # ------------------------------
+    - stage:
+        name: DeployToMinikube
+        identifier: deploy_minikube
+        type: Deployment
+        spec:
+          service:
+            serviceRef: python-webapp-service
+          environment:
+            environmentRef: dev
+            infrastructureDefinitions:
+              - identifier: minikube      # your harness delegate connected to Minikube
+          execution:
+            steps:
+              - step:
+                  name: Deploy via Helm
+                  identifier: helm_deploy
+                  type: HelmDeploy
+                  spec:
+                    chartName: python-webapp
+                    chartPath: helm/python-webapp
+                    repoType: Git
+                    valuesPaths:
+                      - values.yaml
+                    releaseName: python-webapp
+                    helmVersion: V3
+                    delegateSelectors:
+                      - minikube                  # ensure the delegate runs this
+                    overrideValues:
+                      image.repository: <+pipeline.stages.BuildAndPush.spec.execution.steps.build_push_docker.output.imageRepo>
+                      image.tag: <+pipeline.stages.BuildAndPush.spec.execution.steps.build_push_docker.output.imageTag>
